@@ -9,7 +9,13 @@ class IoT_Controller:
         IoT_Controller.client.on_message = IoT_Controller.on_message
         #must connect to the MQTT message broker at "localhost" on port 1883
         IoT_Controller.client.connect("localhost",1883)
-        IoT_Controller.client.subscribe("*")
+#****************************************************************************
+        # The topic wildcards to use when subscribing are
+        # "+" for a single level, e.g., house/+ will catch house/temp but not /house/temp/room
+        # "#" for a multiple levels, e.g., # will catch house/temp,  /house/temp/room, and bad/bad/cat
+        #IoT_Controller.client.subscribe("*")
+        IoT_Controller.client.subscribe("#")
+#****************************************************************************
 
     def on_message(client, userdata, message):
         #this is where we handle the messages
