@@ -1,20 +1,19 @@
 import paho.mqtt.client as mqtt
+import json
 
 class IoT_Controller:
     client = None
-    #TODO: support for collections of conditions leading to single outputs 
-    rules = [
-		{
-			"condition":{"topic":"house/temp", "comparison":">", "value":30},
-			"action":{"message":"It's too hot, turn on the AC", "topic":"room/AC", "value":"on"}
-		},
-		{
-			"condition":{"topic":"house/temp", "comparison":"<", "value":20},
-			"action":{"message":"It's too cold, turn on the heat", "topic":"room/heat", "value":"on"}
-		}
-	]
+    #JSON : JavaScript Object Notation is the format used for the rules below
+    # [] lists of items go between []
+    # {} lists of key-value pairs go between {} (dictionaries)
+    rules = []
+    mqtt_data = {}
 
     def configure():
+        filename = "rules.json"
+        with open(filename,'r') as file:
+            IoT_Controller.rules = json.load(file)
+
         IoT_Controller.client = mqtt.Client()
         #pass the reference to the callback function to handle incoming messages
         IoT_Controller.client.on_message = IoT_Controller.on_message
@@ -36,6 +35,9 @@ class IoT_Controller:
             print("String")
             value = message.payload.decode("utf-8")
         topic = message.topic
+        #record the received data in our dictionary, replacing any older value for the same topic
+        IoT_Controller.mqtt_data[topic] = value
+
         #the only action is the printout
         print(topic, value)
 
@@ -48,12 +50,25 @@ class IoT_Controller:
 #		},
 
         for rule in IoT_Controller.rules:
-            condition = rule["condition"]
-            if topic == condition["topic"] and IoT_Controller.condition_met(value,condition["comparison"],condition["value"]):
+            conditions = rule["conditions"] #changed from condition
+            conditions_met = True
+            for condition in conditions:
+                #use the topic from the condition to access the value in the mqtt_data dictionary
+                topic = condition["topic"]
+                try:
+                    value = IoT_Controller.mqtt_data[topic] #not going to work if there is no value for the key provided
+                    condition_met = IoT_Controller.condition_met(value,condition["comparison"],condition["value"])
+                except KeyError:
+                    value = None
+                    condition_met = False
+                conditions_met = conditions_met and condition_met
+
+            if conditions_met:
                 #action
                 action = rule["action"]
                 print(action["message"])
                 IoT_Controller.client.publish(action["topic"],action["value"])
+
 
     def condition_met(value,comp_operator,comp_value):
         if comp_operator == ">":
