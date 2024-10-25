@@ -1,5 +1,6 @@
 import paho.mqtt.client as mqtt
 import json
+import time
 
 class IoT_Controller:
     client = None
@@ -8,6 +9,8 @@ class IoT_Controller:
     # {} lists of key-value pairs go between {} (dictionaries)
     rules = []
     mqtt_data = {}
+    # to remember the messages we sent out
+    message_log = []
 
     def configure():
         filename = "rules.json"
@@ -35,6 +38,16 @@ class IoT_Controller:
             print("String")
             value = message.payload.decode("utf-8")
         topic = message.topic
+
+        #discriminate messages that I sent vs messages that I did not send
+        #if IoT_Controller.message_log contains an entry
+        for entry in IoT_Controller.message_log:
+            if entry["time"] < time.time() - 5:
+                #delete old message_log entries
+                IoT_Controller.message_log.remove(entry)
+            elif entry["topic"] == topic and entry["value"] == value:
+                return
+
         #record the received data in our dictionary, replacing any older value for the same topic
         IoT_Controller.mqtt_data[topic] = value
 
@@ -68,6 +81,9 @@ class IoT_Controller:
                 action = rule["action"]
                 print(action["message"])
                 IoT_Controller.client.publish(action["topic"],action["value"])
+                #record that we sent that message
+                entry = {"time":time.time(), "topic":action["topic"], "value":action["value"]}
+                IoT_Controller.message_log.append(entry) #end the item to the end of the list
 
 
     def condition_met(value,comp_operator,comp_value):
